@@ -138,6 +138,8 @@ def main():
         #   프로세스를 한다.
     return
 
+# usage
+#python main.py -c Ch1 Ch2 -p B01 B03 F03 D02 /home/kevin/Downloads/RawData/
 
 if __name__ == "__main__":
     main()
