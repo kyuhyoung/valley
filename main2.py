@@ -7,7 +7,10 @@ import numpy as np
 
 def compute_loss(li_val, bin_int, pos, tgt, baias, binwidth):
     valley = find_main_valley(li_val, bin_int, pos, baias, binwidth)
-    loss = abs(valley - tgt)
+    if tgt:
+        loss = abs(valley - tgt)
+    else:
+        loss = None
     return loss, valley
 
 
@@ -91,8 +94,11 @@ def get_target_value(di_gt, col, fn_csv):
     tokens = col.split(' ')
     ch = tokens[0]
     id = date + '_' + pc + '_' + ch
-    tgt = di_gt[id]
-    return tgt
+    if di_gt:
+        tgt = di_gt[id]
+    else:
+        tgt = None
+    return id, tgt
 
 def process(fn_csv, li_coi, bin_int, pos, baias, di_gt, binwidth):
     #   csv 파일을 읽는다
@@ -115,19 +121,23 @@ def process(fn_csv, li_coi, bin_int, pos, baias, di_gt, binwidth):
         #   데이터에서 계곡을 찾는다.
     #loss_total = 0
     #loss_max = -1
-    li_loss = []
-    li_thres = []
-    li_tgt = []
+    if di_gt:
+        li_loss, li_tgt = [], []
+    else:
+        li_loss, li_tgt = None, None
+    li_id, li_thres = [], []
     for col, li_val in di_col_li_val.items():
-        tgt = get_target_value(di_gt, col, fn_csv)
+        id, tgt = get_target_value(di_gt, col, fn_csv)
         loss, thres = compute_loss(li_val, bin_int, pos, tgt, baias, binwidth)
-        li_loss.append(loss)
+        if di_gt:
+            li_loss.append(loss)
+            li_tgt.append(tgt)
         li_thres.append(thres)
-        li_tgt.append(tgt)
+        li_id.append(id)
         #valley = find_main_valley(li_val)
         #di_col_valley[col] = valley
     #return di_col_valley
-    return li_loss, li_thres, li_tgt
+    return li_id, li_loss, li_thres, li_tgt
 
 
 def get_list_of_files_with_string_under_subfolders(folder_name, li_str):
@@ -173,28 +183,25 @@ def get_list_of_files_with_string_under_subfolders(folder_name, li_str):
 def parse_args():
     parser = OptionParser('Finding valley in 1D data')
     #parser.add_argument('-c', '--coi', action='append', nargs=2)
-    parser.add_option('-b', '--bias', dest='bias_abs', help="absolute value of offset")
+    parser.add_option('-b', '--bias', dest='bias', help="bias")
     parser.add_option('-c', '--coi', dest='coi', nargs=2, help="columns of interest")
     parser.add_option('-g', '--gt', dest='gt', help="ground truth")
-    parser.add_option('-n', '--n_div', dest='n_div', help="# of position")
+    parser.add_option('-n', '--n_div', dest='n_div', help="position")
     parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
-    parser.add_option('-r', '--bir', dest='bir', nargs=2, help="bin interval range")
-    parser.add_option('-w', '--wid', dest='wid', nargs=2, help="bin width range")
+    parser.add_option('-r', '--bi', dest='bi', help="bin interval")
+    parser.add_option('-w', '--wid', dest='wid', help="bin width range")
     (options, args) = parser.parse_args()
-    return options.pc, options.coi, options.bir, options.gt, \
-           int(options.n_div), int(options.bias_abs), \
-           options.wid, args[0]
+    return options.pc, options.coi, int(options.bi), options.gt, \
+           float(options.n_div), float(options.bias), \
+           float(options.wid), args[0]
 
 def main():
     #   인자를 파싱한다.
-    li_pc, li_coi, bin_int_range, csv_gt, n_div, bias_abs, bin_width_range, dir_csv = parse_args()
+    li_pc, li_coi, bin_int, csv_gt, pos, baias, bin_width, dir_csv = parse_args()
     li_fn_csv = \
         get_list_of_files_with_string_under_subfolders(
             dir_csv, li_pc)
-    bin_int_min, bin_int_max = bin_int_range
-    bin_int_min, bin_int_max = int(bin_int_min), int(bin_int_max)
-    bin_width_min, bin_width_max = bin_width_range
-    bin_width_min, bin_width_max = int(bin_width_min), int(bin_width_max)
+    '''
     min_error_total = 10000000000000000000000000000000.0
     bin_width_best_total = -1
     bin_int_best_total = -1
@@ -208,85 +215,56 @@ def main():
     bias_best_max = -1000000
     pos_i_best_max = -1
     n_div_best_max = -1
+    '''
 
-    di_gt = get_ground_truth(csv_gt)
-    for bin_width in xrange(bin_width_min, bin_width_max):
-        print('bin_width : %d / %d' % (bin_width, bin_width_max))
-        bin_width = float(bin_width)
-        for bin_int in xrange(bin_int_min, bin_int_max):
-            print('\tbin_int : %d / %d' % (bin_int, bin_int_max))
-            n_div_new = min(n_div, bin_int)
-            #bin_int = float(bin_int)
-            for bias in xrange(-bias_abs, bias_abs + 1):
-                baias = float(bias) / 100.
-                print('\t\tbias : %d / %d' % (bias, bias_abs + 1))
-                for pos_i in xrange(n_div_new + 1):
-                    print('\t\t\tpos : {} / {}'.format(pos_i, n_div_new))
-                    #n_div_new = float(n_div_new)
-                    pos = float(pos_i) / float(n_div_new)
-                    #   각 폴더에 대해 파일에 대해
-                    error_total = 0
-                    error_max = -1
-                    li_thres_all = []
-                    li_tgt_all = []
-                    li_error_all = []
-                    for fn_csv in li_fn_csv:
-                        li_error, li_thres, li_tgt = \
-                            process(fn_csv, li_coi, bin_int, pos, baias,
-                                       di_gt, bin_width)
-                        li_thres_all += li_thres
-                        li_tgt_all += li_tgt
-                        li_error_all += li_error
-                        sum_error = sum(li_error)
-                        max_error = max(li_error)
-                        error_total += sum_error
-                        if max_error > error_max:
-                            error_max = max_error
+    if csv_gt:
+        di_gt = get_ground_truth(csv_gt)
+    else:
+        di_gt = None
+    #bin_width = 5
+    print('bin_width : {}'.format(bin_width))
+    bin_width = float(bin_width)
+    #bin_int = 10
+    print('bin_int : {}'.format(bin_int))
+    #print('n_div : {}'.format(n_div))
+    #n_div_new = min(n_div, bin_int)
+    #print('n_div_new : {}'.format(n_div_new))  #bin_int = float(bin_int)
+    #baias = float(bias) / 100.
+    print('baias : {}'.format(baias))  # bin_int = float(bin_int)
+    print('pos : {}'.format(pos))
+    #   각 폴더에 대해 파일에 대해
+    li_thres_all, li_id_all = [], []
+    if csv_gt:
+        error_max = -1
+        error_total = 0
+        li_tgt_all = []
+        li_error_all = []
+    for fn_csv in li_fn_csv:
+        print('processing {}'.format(fn_csv))
+        li_id, li_error, li_thres, li_tgt = \
+            process(fn_csv, li_coi, bin_int, pos, baias,
+                       di_gt, bin_width)
+        li_thres_all += li_thres
+        li_id_all += li_id
+        if csv_gt:
+            li_tgt_all += li_tgt
+            li_error_all += li_error
+            sum_error = sum(li_error)
+            max_error = max(li_error)
+            error_total += sum_error
+            if max_error > error_max:
+                error_max = max_error
+    n_data = len(li_error_all)
+    if csv_gt:
+        error_avg = error_total / n_data
+        print('error_avg : %f' % (error_avg))
+        print('error_max : %f' % (error_max))
+    print('li_id_all :')
+    print(li_id_all)
+    print('li_thres_all :')
+    print(li_thres_all)
 
-                    print('\t\t\t\terror_total : %f,\tmin_error_total : %f' % (error_total, min_error_total))
-                    print('\t\t\t\terror_max : %f,\tmin_error_max : %f' % (error_max, min_error_max))
-                    if error_total < min_error_total:
-                        print('\t\t\t\tmin_error_total has been changed')
-                        min_error_total = error_total
-                        bin_width_best_total = bin_width
-                        bin_int_best_total = bin_int
-                        bias_best_total = bias
-                        pos_i_best_total = pos_i
-                        n_div_best_total = n_div_new
-
-                        li_thres_all_total = li_thres_all
-                        li_tgt_all_total = li_tgt_all
-                        li_error_all_total = li_error_all
-
-                    if error_max < min_error_max:
-                        print('\t\t\t\tmin_error_max has been changed')
-                        min_error_max = error_max
-                        bin_width_best_max = bin_width
-                        bin_int_best_max = bin_int
-                        bias_best_max = bias
-                        pos_i_best_max = pos_i
-                        n_div_best_max = n_div_new
-
-                        li_thres_all_max = li_thres_all
-                        li_tgt_all_max = li_tgt_all
-                        li_error_all_max = li_error_all
-
-
-                        #   프로세스를 한다.
-    print('min_error_total : {}'.format(min_error_total))
-    print('bin_width_best_total : {}'.format(bin_width_best_total))
-    print('bin_int_best_total : {}'.format(bin_int_best_total))
-    print('bias_best_total : {}'.format(bias_best_total))
-    print('pos_i_best_total : {}'.format(pos_i_best_total))
-    print('n_div_best_total : {}'.format(n_div_best_total))
-
-    print('min_error_max : {}'.format(min_error_max))
-    print('bin_width_best_max : {}'.format(bin_width_best_max))
-    print('bin_int_best_max : {}'.format(bin_int_best_max))
-    print('bias_best_max : {}'.format(bias_best_max))
-    print('pos_i_best_max : {}'.format(pos_i_best_max))
-    print('n_div_best_max : {}'.format(n_div_best_max))
-
+    '''
     print('li_tgt_all_total :')
     print(li_tgt_all_total)
     print('li_thres_all_total :')
@@ -300,8 +278,7 @@ def main():
     print(li_thres_all_max)
     print('li_error_all_max :')
     print(li_error_all_max)
-
-
+    '''
     return
 
 # usage
