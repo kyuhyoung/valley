@@ -1,0 +1,8 @@
+#	bin width
+0.1 20
+#	bin interval
+1 30
+#	bias
+-10 10
+#	offset
+0 1
