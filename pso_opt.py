@@ -282,20 +282,18 @@ def get_ground_truth(fn_gt):
     return di_year_pc_2_thres
 
 
+# -B bounds.txt -c
 def parse_args():
     parser = OptionParser('Finding valley in 1D data')
     #parser.add_argument('-c', '--coi', action='append', nargs=2)
-    parser.add_option('-b', '--bias', dest='bias', help="bias")
-    parser.add_option('-B', '--bound', dest='bound', help="file name of lower/upper bounds")
+    parser.add_option('-b', '--bound', dest='bound', help="file name of lower/upper bounds")
     parser.add_option('-c', '--coi', dest='coi', nargs=2, help="columns of interest")
     parser.add_option('-C', '--criterion', dest='criterion', help="error criterion")
     parser.add_option('-g', '--gt', dest='gt', help="ground truth")
     parser.add_option('-k', '--kind', dest='kind', help="error kind")
-    parser.add_option('-n', '--n_div', dest='n_div', help="position")
     parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
     #parser.add_option('-r', '--bi', dest='bi', help="bin interval")
     parser.add_option('-s', '--swarm', dest='swarm', help="swarm size")
-    parser.add_option('-w', '--wid', dest='wid', help="bin width range")
     (options, args) = parser.parse_args()
     return options.pc, options.coi, options.gt, options.bound, options.kind, \
            options.criterion, int(options.swarm),  args[0]
@@ -353,6 +351,8 @@ def main():
     print(xopt)
     print('fopt : ')
     print(fopt)
+
+#-C max -k thres -g ./RawData/thres_gt.txt -s 20 -b bounds.txt -c Ch1 Ch2 -p B01 B03 F03 D02 ./RawData
 
 if __name__ == "__main__":
     main()

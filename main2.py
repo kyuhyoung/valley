@@ -57,8 +57,10 @@ def find_main_valley(li_val, bin_int, pos, baias, binwidth):
     '''
     offset = int(round(bin_int * pos))
     bin_center = bin_from + offset
+    bin_center = min(bin_center, bin_end - 1)
     bin_thres = b[bin_center]
     t1 = threshold(li_val, bin_thres)
+    #t1 = li_val > bin_thres
     t2 = np.count_nonzero(t1)
     t3 = sum(t1)
     mean = t3 / t2
@@ -190,7 +192,15 @@ def process_pc(error_kind, fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos
     #return di_col_valley
     return li_id, li_loss, li_thres, li_mean, li_tgt
 
-
+'''
+bin_with : 6.8836119469  
+bin_int : 17
+bias : -0.456630543695
+offset : 0.669097459895
+error : 52.7261853982
+-w 6.8836119469 -r 17 -b -0.456630543695 -n 0.669097459895
+-k thres -w 6.8836119469 -r 17 -b -0.456630543695 -n 0.669097459895 -g ./RawData/thres_gt.txt -c Ch1 Ch2 -p B01 B03 F03 D02 ./RawData
+'''
 
 
 def parse_args():
@@ -199,12 +209,13 @@ def parse_args():
     parser.add_option('-b', '--bias', dest='bias', help="bias")
     parser.add_option('-c', '--coi', dest='coi', nargs=2, help="columns of interest")
     parser.add_option('-g', '--gt', dest='gt', help="ground truth")
+    parser.add_option('-k', '--kind', dest='kind', help="error kind")
     parser.add_option('-n', '--n_div', dest='n_div', help="position")
     parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
     parser.add_option('-r', '--bi', dest='bi', help="bin interval")
-    parser.add_option('-w', '--wid', dest='wid', help="bin width range")
+    parser.add_option('-w', '--wid', dest='wid', help="bin width")
     (options, args) = parser.parse_args()
-    return options.pc, options.coi, int(options.bi), options.gt, \
+    return options.kind, options.pc, options.coi, int(options.bi), options.gt, \
            float(options.n_div), float(options.bias), \
            float(options.wid), args[0]
 
@@ -215,7 +226,7 @@ def parse_args():
 
 def main():
     #   인자를 파싱한다.
-    li_pc, li_coi, bin_int, csv_gt, pos, baias, bin_width, dir_csv = parse_args()
+    error_kind, li_pc, li_coi, bin_int, csv_gt, pos, baias, bin_width, dir_csv = parse_args()
     li_fn_csv = \
         get_list_of_files_with_string_under_subfolders(
             dir_csv, li_pc)
@@ -230,8 +241,8 @@ def main():
     print('bin_int : {}'.format(bin_int))
     print('baias : {}'.format(baias))  # bin_int = float(bin_int)
     print('pos : {}'.format(pos))
-    li_id_all, li_thres_all, li_tgt_all, li_error_all, error_avg, error_max = \
-        process(csv_gt, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos)
+    li_id_all, li_thres_all, li_mean_all, li_tgt_all, li_error_all, error_avg, error_max = \
+        process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos)
 
     #n_data = len(li_error_all)
     if csv_gt:
