@@ -28,8 +28,9 @@ g_fn_csv_gt_train = ''
 g_fn_csv_gt_val = 'stage_labels_val.csv'
 g_di_slide_mpp = None
 '''
-g_is_error_mean = None
-g_csv_gt = None
+g_error_kind = None
+g_criterion = None
+#g_csv_gt = None
 g_li_fn_csv = None
 g_li_coi = None
 g_di_gt = None
@@ -42,7 +43,7 @@ g_li_bin_width, g_li_bin_int, g_li_bias, g_li_offset = [], [], [], []
 g_agent, g_gen, g_size_swarm = 0, 1, -1
 
 #g_kappa_max = -1
-g_error_min = 100000000000000
+g_cost_min = 100000000000000
 
 '''
 lb_th_01, ub_th_01 = 0.9, 1.0
@@ -72,7 +73,7 @@ def con_integer(x):
     #th_01, n_bin, n_big = x
     bin_width, bin_int, bias, offset = x
     #d_bin_int = bin_int - math.floor(bin_int)
-    d_bin_int = bin_int - math.round(bin_int)
+    d_bin_int = bin_int - float(round(bin_int))
     #d_big = n_big - math.floor(n_big)
     #return [-(x1 + 0.25)**2 + 0.75*x2]
     #return [0.00001 - d_bin**2 - d_big**2]
@@ -122,12 +123,12 @@ def generate_pN_csv(fn_csv, li_prediction, li_fn, number2label, n_node):
     return csvfile
 
 
-def compute_error(is_error_mean, csv_gt, li_fn_csv, li_coi, di_gt, bin_width, bin_int, bias, offset):
-    li_id_all, li_thres_all, li_tgt_all, li_error_all, error_avg, error_max = \
-        process(csv_gt, li_fn_csv, li_coi, di_gt, bin_width, bin_int, bias, offset)
-    if is_error_mean:
+def compute_error(error_kind, criterion, li_fn_csv, li_coi, di_gt, bin_width, bin_int, bias, offset):
+    li_id_all, li_thres_all, li_mean_all, li_tgt_all, li_error_all, error_avg, error_max = \
+        process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, bias, offset)
+    if 'avg' == criterion:
         error = error_avg
-    else:
+    else:# 'max' == criterion:
         error = error_max
     return error, li_thres_all
 
@@ -139,7 +140,8 @@ def my_fun(x):
     bin_width, bin_int, bias, offset = x
     print('####################################################################')
     #global g_agent, g_gen, g_li_th_01, g_li_n_bin, g_li_n_big, g_kappa_max, g_lb, g_ub
-    global g_agent, g_gen, g_li_bin_width, g_li_bin_int, g_li_bias, g_li_offset, g_error_min, g_lb, g_ub
+    global g_agent, g_gen, g_li_bin_width, g_li_bin_int, g_li_bias, \
+        g_li_offset, g_cost_min
     debug_here()
     g_agent += 1
     print('g_agent : ' + str(g_agent) + ' / ' + str(g_size_swarm) + ',  g_gen : ' + str(g_gen))
@@ -150,86 +152,88 @@ def my_fun(x):
     if g_size_swarm <= g_agent:
         g_agent = 0
 
-    cost, li_prediction = compute_error(g_is_error_mean, g_csv_gt, g_li_fn_csv, g_li_coi, g_di_gt,
+    bin_int = int(round(bin_int))
+    cost, li_prediction = compute_error(g_error_kind, g_criterion, g_li_fn_csv, g_li_coi, g_di_gt,
                                          bin_width, bin_int, bias, offset)
-    '''
     #fn_csv_sub = 'submition.csv'
     #th_tissue_0255 = 0.5
     #n_node = 5
     #num2label = get_number_2_label()
     #   extract features
 
-    res = extract_features(th_01, n_bin, n_big, g_li_fn_heatmap, g_fn_csv_gt_train,
-                           g_fn_csv_gt_val, g_di_slide_mpp)
-    li_li_feat_train, li_label_train, li_li_feat_val, li_label_val, li_fn_heatmap_val, df_gt_val = res
-    #   learn classifier
-    klassifier = learn_classifier(li_li_feat_train, li_label_train)
-    cost, li_prediction = evaluate_classifier(klassifier, li_li_feat_val, li_label_val, li_fn_heatmap_val,
-                               num2label, n_node, df_gt_val, fn_csv_sub)
-    kappa_score = -cost
-
-    g_li_th_01.append(th_01)
-    g_li_n_bin.append(n_bin)
-    g_li_n_big.append(n_big)
+    g_li_bin_width.append(bin_width)
+    g_li_bin_int.append(bin_int)
+    g_li_bias.append(bias)
+    g_li_offset.append(offset)
     if 0 == g_agent:
-        x = th_01
-        y = n_bin
-        z = n_big
+        w = bin_width
+        x = bin_int
+        y = bias
+        z = offset
         str_bound = ''
         for idx, lb in enumerate(g_lb):
             ub = g_ub[idx]
             str_bound += str(lb) + '_' + str(ub)+ '_'
 
-        fn_plot = 'f_score_' + str_bound + str(g_size_swarm) + '_' + str(g_gen) + '.png'
+        fn_plot = g_error_kind + '_' + g_criterion + '_' + str_bound + str(g_size_swarm) + '_' + str(g_gen) + '.png'
 
         fig = plt.figure()
         #ax = fig.add_subplot(2, 1, 1)
         #ax = fig.gca(projection='3d')
         #fig, ax = plt.subplot(1, 1, 1)
-        a1 = fig.add_subplot(2, 1, 1)
+        a1 = fig.add_subplot(3, 1, 1)
         # a.set_title('error vs. epoch')
-        plt.scatter(g_li_th_01, g_li_n_bin)
+        #plt.scatter(g_li_th_01, g_li_n_bin)
+        plt.scatter(g_li_bin_width, g_li_bin_int)
         #plt.xlabel('cofidence threshold')
-        plt.ylabel('# of histogram bin')
+        plt.ylabel('bin interval')
         a1.set_xlim([g_lb[0], g_ub[0]])
         a1.set_ylim([g_lb[1], g_ub[1]])
         #ax.set_zlim([g_lb[2], g_ub[2]])
-        a1 = fig.add_subplot(2, 1, 2)
-        plt.scatter(g_li_th_01, g_li_n_big)
-        plt.xlabel('cofidence threshold')
-        plt.ylabel('# of biggest blob')
+
+        a1 = fig.add_subplot(3, 1, 2)
+        #plt.scatter(g_li_th_01, g_li_n_big)
+        plt.scatter(g_li_bin_width, g_li_bias)
+        #plt.xlabel('cofidence threshold')
+        plt.ylabel('bias')
         a1.set_xlim([g_lb[0], g_ub[0]])
         a1.set_ylim([g_lb[2], g_ub[2]])
+
+        a1 = fig.add_subplot(3, 1, 3)
+        #plt.scatter(g_li_th_01, g_li_n_big)
+        plt.scatter(g_li_bin_width, g_li_offset)
+        plt.xlabel('bin width')
+        plt.ylabel('offset')
+        a1.set_xlim([g_lb[0], g_ub[0]])
+        a1.set_ylim([g_lb[3], g_ub[3]])
+
+
         fig.savefig(fn_plot)
         print('particle plot is saved at : ' + fn_plot)
-        g_li_th_01 = []
-        g_li_n_bin = []
-        g_li_n_big = []
+
+        g_li_bin_width = []
+        g_li_bin_int = []
+        g_li_bias = []
+        g_li_offset = []
         g_gen += 1
 
-    if(kappa_score > g_kappa_max):
-        #print(str(fscore))
+    #if(kappa_score > g_kappa_max):
+    if(cost < g_cost_min):
+        msg = 'Min. ' + g_criterion + ' ' + g_error_kind + ' is updated : from ' + str(g_cost_min) + ' to ' + str(cost) + '\n'
+        msg += 'bin_with : ' + str(bin_width) + '\n' + \
+               'bin_int : ' + str(bin_int) + '\n' + \
+               'bias : ' + str(bias) + '\n' + \
+               'offset : ' + str(offset) + '\n'
+        print (msg)
 
-        generate_pN_csv(fn_csv_sub, li_prediction, li_fn_heatmap_val, num2label, n_node)
-        #ground_truth_df = ps.read_csv(ground_truth_path)
-        submission_df = ps.read_csv(fn_csv_sub)
-        #   compute kappa
-        kappa = calculate_kappa(ground_truth=df_gt_val, submission=submission_df)
-        #   return -kappa
-        #return -kappa_score
-        fn_model = 'model_best_' + str(th_01) + '_' + str(n_bin) + '_' + str(n_big) + '.xml'
-        msg = 'Max. f-score is updated : from ' + str(g_kappa_max) + ' to ' + str(kappa_score) + \
-              '\n' + str1 + '\n' + str2 + '\nClassifier is saved at : ' + fn_model + '\n'
-        msg += 'Kappa score is ' + str(kappa)
-
-        g_kappa_max = kappa_score
-        slack_notify(msg, username='Kevin')
-        klassifier.save(fn_model)
+        #g_kappa_max = kappa_score
+        g_cost_min = cost
+        #slack_notify(msg, username='Kevin')
+        #klassifier.save(fn_model)
 
     #print('Kappa score : ' + str(kappa_score))
-    print('f-score : ' + str(kappa_score))
+    print('cost of ' + g_criterion + ' ' + g_error_kind + ' : ' + str(cost) + ' / ' + str(g_cost_min))
     print('####################################################################\n')
-    '''
     return cost
 
 '''
@@ -262,6 +266,41 @@ def get_bounds_txt(fx_bounds):
     return lb, ub
 
 
+def get_ground_truth(fn_gt):
+    di_year_pc_2_thres = {}
+    with open(fn_gt) as gt:
+        for line in gt:
+            token = line.split(' ')
+            date = token[0]
+            pc = token[1]
+            thres_ch1 = float(token[2])
+            thres_ch2 = float(token[3])
+            id_ch1 = date + '_' + pc + '_Ch1'
+            id_ch2 = date + '_' + pc + '_Ch2'
+            di_year_pc_2_thres[id_ch1] = thres_ch1
+            di_year_pc_2_thres[id_ch2] = thres_ch2
+    return di_year_pc_2_thres
+
+
+def parse_args():
+    parser = OptionParser('Finding valley in 1D data')
+    #parser.add_argument('-c', '--coi', action='append', nargs=2)
+    parser.add_option('-b', '--bias', dest='bias', help="bias")
+    parser.add_option('-B', '--bound', dest='bound', help="file name of lower/upper bounds")
+    parser.add_option('-c', '--coi', dest='coi', nargs=2, help="columns of interest")
+    parser.add_option('-C', '--criterion', dest='criterion', help="error criterion")
+    parser.add_option('-g', '--gt', dest='gt', help="ground truth")
+    parser.add_option('-k', '--kind', dest='kind', help="error kind")
+    parser.add_option('-n', '--n_div', dest='n_div', help="position")
+    parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
+    #parser.add_option('-r', '--bi', dest='bi', help="bin interval")
+    parser.add_option('-s', '--swarm', dest='swarm', help="swarm size")
+    parser.add_option('-w', '--wid', dest='wid', help="bin width range")
+    (options, args) = parser.parse_args()
+    return options.pc, options.coi, options.gt, options.bound, options.kind, \
+           options.criterion, int(options.swarm),  args[0]
+
+'''
 def parse_args():
 
     usage = "usage: %prog [options] slide-files"
@@ -279,7 +318,6 @@ def parse_args():
     parser.add_option("-v", "--csv_val", dest="csv_val", help="CSV file name for validation")
     #parser.add_option("-x", "--xml", dest="dir_xml", help="directory of xml files")
     (options, args) = parser.parse_args()
-    '''
     if not(options.level and options.classifier):
         #print('OpenSlide level, model file name and batch size should be given !!')
         print('OpenSlide level, classifier model file name should be given !!')
@@ -289,38 +327,23 @@ def parse_args():
         #print('OpenSlide level, model file name and batch size should be given !!')
         print('factor of batch size per GPU should be float between 0 and 1 !!')
         sys.exit()
-    '''
     n_file = len(args)
     print(args)
     print('# files : ' + str(n_file))
     return options, args
     #return pptions.dir_mask, options.dir_xml, int(options.int_slack), args
     #return options.dir_xml, int(options.int_slack), args
-
+'''
 
 def main():
-    global g_lb, g_ub, g_size_swarm, \
-        g_is_error_mean, g_csv_gt, g_li_fn_csv, g_li_coi, g_di_gt
-    li_pc, li_coi, csv_gt, dir_csv = parse_args()
+    global g_lb, g_ub, g_size_swarm, g_error_kind, \
+        g_criterion, g_csv_gt, g_li_fn_csv, g_li_coi, g_di_gt
+    li_pc, g_li_coi, csv_gt, fn_bound, g_error_kind, g_criterion, g_size_swarm, dir_csv = parse_args()
     g_li_fn_csv = \
         get_list_of_files_with_string_under_subfolders(
             dir_csv, li_pc)
-    di_gt = get_ground_truth(csv_gt)
-
-
-    opts, g_li_fn_csv = parse_args()
-    g_fn_csv_gt_train = opts.csv_train
-    g_fn_csv_gt_val = opts.csv_val
-    g_size_swarm = int(opts.size_swarm)
-    fn_bound = opts.fn_bound
-    n_slide = len(g_li_fn_heatmap)
-    '''
-    shall_use_mpp = 0 != int(opts.use_mpp)
-    if shall_use_mpp:
-        fn_mpp = opts.fn_mpp
-        g_di_slide_mpp = get_mpp_txt(fn_mpp)
-    debug_here()
-    '''
+    g_di_gt = get_ground_truth(csv_gt)
+    #g_size_swarm = int(opts.size_swarm)
     g_lb, g_ub = get_bounds_txt(fn_bound)
 
     print('size_swarm : ' + str(g_size_swarm) + '\n')

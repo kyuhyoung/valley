@@ -4,15 +4,20 @@ from optparse import OptionParser
 import os, csv
 import matplotlib.pyplot as plt
 import numpy as np
-from util import get_list_of_files_with_string_under_subfolders
+from util import get_list_of_files_with_string_under_subfolders, get_exact_file_name_from_path
+from scipy.stats import threshold
 
-def compute_loss(li_val, bin_int, pos, tgt, baias, binwidth):
-    valley = find_main_valley(li_val, bin_int, pos, baias, binwidth)
+def compute_loss(error_kind, li_val, bin_int, pos, tgt, baias, binwidth):
+    valley, mean = find_main_valley(li_val, bin_int, pos, baias, binwidth)
+    if 'mean' == error_kind:
+        val = mean
+    else:
+        val = valley
     if tgt:
-        loss = abs(valley - tgt)
+        loss = abs(val - tgt)
     else:
         loss = None
-    return loss, valley
+    return loss, valley, mean
 
 
 def find_main_valley(li_val, bin_int, pos, baias, binwidth):
@@ -28,6 +33,7 @@ def find_main_valley(li_val, bin_int, pos, baias, binwidth):
     ax = fig.add_subplot(111)
     #n, b, patches = ax.hist(li_val, bins='auto')
     n, b, patches = ax.hist(li_val, bins=np.arange(min(li_val), max(li_val) + binwidth, binwidth))
+    bin_end = len(n)
     bin_max = np.where(n == n.max())
     bin_from = bin_max[0][0]
     bin_to = bin_from + bin_int
@@ -36,6 +42,8 @@ def find_main_valley(li_val, bin_int, pos, baias, binwidth):
     while True:
         bin_from += 1
         bin_to = bin_from + bin_int
+        if  bin_end <= bin_to:
+            break
         t1 = n[bin_from:bin_to]
         mean_cur = t1.mean()
         #print(mean_cur)
@@ -50,8 +58,12 @@ def find_main_valley(li_val, bin_int, pos, baias, binwidth):
     offset = int(round(bin_int * pos))
     bin_center = bin_from + offset
     bin_thres = b[bin_center]
+    t1 = threshold(li_val, bin_thres)
+    t2 = np.count_nonzero(t1)
+    t3 = sum(t1)
+    mean = t3 / t2
     plt.close(fig)
-    return bin_thres
+    return bin_thres, mean
 
 
 def get_ground_truth(fn_gt):
@@ -99,22 +111,26 @@ def get_target_value(di_gt, col, fn_csv):
     return id, tgt
 
 
-def process(csv_gt, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
+def process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
 
-    li_thres_all, li_id_all = [], []
-    if csv_gt:
+    li_thres_all, li_mean_all, li_id_all = [], [], []
+    if di_gt:
         #error_max = -1
         #error_total = 0
         li_tgt_all = []
         li_error_all = []
+    else:
+        li_tgt_all = None
+        li_error_all = None
 
     for fn_csv in li_fn_csv:
         print('processing {}'.format(fn_csv))
-        li_id, li_error, li_thres, li_tgt = \
-            process_pc(fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos)
+        li_id, li_error, li_thres, li_mean, li_tgt = \
+            process_pc(error_kind, fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos)
         li_thres_all += li_thres
+        li_mean_all += li_mean
         li_id_all += li_id
-        if csv_gt:
+        if di_gt:
             li_tgt_all += li_tgt
             li_error_all += li_error
             '''
@@ -124,17 +140,17 @@ def process(csv_gt, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
             if max_error > error_max:
                 error_max = max_error
             '''
-    if csv_gt:
+    if di_gt:
         error_avg = np.average(li_error)
         error_max = max(li_error_all)
     else:
         error_avg = None
         error_max = None
-    return li_id_all, li_thres_all, li_tgt_all, li_error_all, error_avg, error_max
+    return li_id_all, li_thres_all, li_mean_all, li_tgt_all, li_error_all, error_avg, error_max
 
 
 
-def process_pc(fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
+def process_pc(error_kind, fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
     #   csv 파일을 읽는다
     li_col_data = get_csv_reader(fn_csv, ',')
     di_col_li_val = {}
@@ -159,19 +175,20 @@ def process_pc(fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
         li_loss, li_tgt = [], []
     else:
         li_loss, li_tgt = None, None
-    li_id, li_thres = [], []
+    li_id, li_thres, li_mean = [], [], []
     for col, li_val in di_col_li_val.items():
         id, tgt = get_target_value(di_gt, col, fn_csv)
-        loss, thres = compute_loss(li_val, bin_int, pos, tgt, baias, bin_width)
+        loss, thres, mean = compute_loss(error_kind, li_val, bin_int, pos, tgt, baias, bin_width)
         if di_gt:
             li_loss.append(loss)
             li_tgt.append(tgt)
         li_thres.append(thres)
+        li_mean.append(mean)
         li_id.append(id)
         #valley = find_main_valley(li_val)
         #di_col_valley[col] = valley
     #return di_col_valley
-    return li_id, li_loss, li_thres, li_tgt
+    return li_id, li_loss, li_thres, li_mean, li_tgt
 
 
 

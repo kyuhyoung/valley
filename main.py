@@ -4,6 +4,7 @@ from optparse import OptionParser
 import os, csv
 import matplotlib.pyplot as plt
 import numpy as np
+from util import get_exact_file_name_from_path
 
 def compute_loss(li_val, bin_int, pos, tgt, baias, binwidth):
     valley = find_main_valley(li_val, bin_int, pos, baias, binwidth)
@@ -79,9 +80,6 @@ def get_csv_reader(filename, delimiter):
     #return list(reader)
     return reader
 
-def get_exact_file_name_from_path(path):
-
-    return os.path.splitext(os.path.basename(path))[0]
 
 def get_target_value(di_gt, col, fn_csv):
     fn = get_exact_file_name_from_path(fn_csv)

@@ -2,8 +2,8 @@
 
 import os
 
-def get_exact_file_name_from_path(path):
 
+def get_exact_file_name_from_path(path):
     return os.path.splitext(os.path.basename(path))[0]
 
 
