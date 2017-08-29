@@ -335,14 +335,31 @@ def main():
 
     #n_data = len(li_error_all)
     if csv_gt:
+        print('# target : {}'.format(len(li_tgt)))
+        print('li_tgt :')
+        print(li_tgt)
+        print('# error : {}'.format(len(li_error)))
+        print('li_error :')
+        print(li_error)
         print('error_avg : %f' % (error_avg))
         print('error_max : %f' % (error_max))
+    print('# id : {}'.format(len(li_id)))
     print('li_id_all :')
     print(li_id)
+    print('# thres : {}'.format(len(li_thres_int)))
     print('li_thres_all :')
     print(li_thres_int)
+    print('# mean : {}'.format(len(li_mean_int)))
     print('li_mean_all :')
     print(li_mean_int)
+    with open('result.csv', "w") as res:
+        str = 'id,threshold,mean\n'
+        res.write(str)
+        for idx, id in enumerate(li_id):
+            thres = li_thres_int[idx]
+            mean = li_mean_int[idx]
+            str = '{},{},{}\n'.format(id, thres, mean)
+            res.write(str)
     return
 
 # usage
