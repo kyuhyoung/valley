@@ -35,6 +35,10 @@ g_li_fn_csv = None
 g_li_coi = None
 g_di_gt = None
 
+g_best_bin_width = None
+g_best_bin_int = None
+g_best_bias = None
+g_best_offset = None
 #g_fn_csv_bound = 'lower_uppper_bounds.csv'
 
 #g_li_th_01, g_li_n_bin, g_li_n_big = [], [], []
@@ -141,7 +145,8 @@ def my_fun(x):
     print('####################################################################')
     #global g_agent, g_gen, g_li_th_01, g_li_n_bin, g_li_n_big, g_kappa_max, g_lb, g_ub
     global g_agent, g_gen, g_li_bin_width, g_li_bin_int, g_li_bias, \
-        g_li_offset, g_cost_min
+        g_li_offset, g_cost_min, g_best_bin_width, g_best_bin_int, g_best_bias, g_best_offset
+
     debug_here()
     g_agent += 1
     print('g_agent : ' + str(g_agent) + ' / ' + str(g_size_swarm) + ',  g_gen : ' + str(g_gen))
@@ -211,6 +216,12 @@ def my_fun(x):
         fig.savefig(fn_plot)
         print('particle plot is saved at : ' + fn_plot)
 
+        print('g_best_bin_width : ' + str(g_best_bin_width))
+        print('g_best_bin_int : ' + str(g_best_bin_int))
+        print('g_best_bias : ' + str(g_best_bias))
+        print('g_best_offset : ' + str(g_best_offset))
+        print('g_cost_min : ' + str(g_cost_min))
+
         g_li_bin_width = []
         g_li_bin_int = []
         g_li_bias = []
@@ -219,12 +230,17 @@ def my_fun(x):
 
     #if(kappa_score > g_kappa_max):
     if(cost < g_cost_min):
-        msg = 'Min. ' + g_criterion + ' ' + g_error_kind + ' is updated : from ' + str(g_cost_min) + ' to ' + str(cost) + '\n'
+        msg = '\nMin. ' + g_criterion + ' ' + g_error_kind + ' is updated : from ' + str(g_cost_min) + ' to ' + str(cost) + '\n'
         msg += 'bin_with : ' + str(bin_width) + '\n' + \
                'bin_int : ' + str(bin_int) + '\n' + \
                'bias : ' + str(bias) + '\n' + \
                'offset : ' + str(offset) + '\n'
         print (msg)
+
+        g_best_bin_width = bin_width
+        g_best_bin_int = bin_int
+        g_best_bias = bias
+        g_best_offset = offset
 
         #g_kappa_max = kappa_score
         g_cost_min = cost

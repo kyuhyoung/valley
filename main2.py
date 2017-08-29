@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
 from optparse import OptionParser
 import os, csv
 import matplotlib.pyplot as plt
@@ -18,6 +19,32 @@ def compute_loss(error_kind, li_val, bin_int, pos, tgt, baias, binwidth):
     else:
         loss = None
     return loss, valley, mean
+
+def get_dict_of_column_2_data_list_from_csv(fn_csv, li_coi):
+    li_col_data = get_csv_reader(fn_csv, ',')
+    di_col_li_val = {}
+    #   각 컬럼에 대해
+    for row in li_col_data:
+        #   column of interest에 해당하지 않으면
+        for header, value in row.items():
+            for coi in li_coi:
+                if coi not in header:
+                    continue
+                val = float(value)
+                try:
+                    di_col_li_val[header].append(val)
+                except KeyError:
+                    di_col_li_val[header] = [val]
+    return di_col_li_val
+
+
+def compute_mean_of_non_zero(li_val, thres):
+    t1 = threshold(li_val, thres)
+    #t1 = li_val > bin_thres
+    t2 = np.count_nonzero(t1)
+    t3 = sum(t1)
+    mean = t3 / t2
+    return mean
 
 
 def find_main_valley(li_val, bin_int, pos, baias, binwidth):
@@ -59,11 +86,7 @@ def find_main_valley(li_val, bin_int, pos, baias, binwidth):
     bin_center = bin_from + offset
     bin_center = min(bin_center, bin_end - 1)
     bin_thres = b[bin_center]
-    t1 = threshold(li_val, bin_thres)
-    #t1 = li_val > bin_thres
-    t2 = np.count_nonzero(t1)
-    t3 = sum(t1)
-    mean = t3 / t2
+    mean = compute_mean_of_non_zero(li_val, bin_thres)
     plt.close(fig)
     return bin_thres, mean
 
@@ -112,6 +135,87 @@ def get_target_value(di_gt, col, fn_csv):
         tgt = None
     return id, tgt
 
+def compute_mean(li_id, li_thres, li_fn_csv, li_coi):
+    li_mean = []
+    for fn_csv in li_fn_csv:
+        print('processing {}'.format(fn_csv))
+        di_col_li_val = get_dict_of_column_2_data_list_from_csv(fn_csv, li_coi)
+        for col, li_val in di_col_li_val.items():
+            id, tgt = get_target_value(None, col, fn_csv)
+            idx = li_id.index(id)
+            thres = li_thres[idx]
+            mean = compute_mean_of_non_zero(li_val, thres)
+            li_mean.append(mean)
+    return li_mean
+
+def meen(a):
+    return sum(a) / len(a)
+
+def process2(error_kind, li_fn_csv, li_coi, di_gt, fn_param):
+    #   read lisit of param set
+    li_param_set = []
+    with open(fn_param) as par:
+        for line in par:
+            if '#' == line[0]:
+                continue
+            token = line.split(' ')
+            bin_width = float(token[0])
+            bin_int = int(token[1])
+            bias = float(token[2])
+            offset = float(token[3])
+            li_param_set.append({
+                'bin_width' : bin_width,
+                'bin_int' : bin_int,
+                'bias' : bias,
+                'offset' : offset
+            })
+
+    # for each param set
+    li_id, li_tgt = None, None
+    li_li_thres, li_li_mean = [], []
+    if di_gt:
+        li_li_error, li_error_avg, li_error_max = [], [], []
+    else:
+        li_error_final = None
+        li_tgt = None
+        error_avg_final = None
+        error_max_final = None
+
+    n_param_set = len(li_param_set)
+    for param_set in li_param_set:
+        bin_width = param_set['bin_width']
+        bin_int = param_set['bin_int']
+        bias = param_set['bias']
+        offset = param_set['offset']
+        #   get threshold
+        li_id, li_thres, li_mean, li_tgt, li_error, error_avg, error_max = \
+            process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, bias, offset)
+        #   append threshold
+        li_li_thres.append(li_thres)
+        li_li_mean.append(li_mean)
+        if di_gt:
+            li_li_error.append(li_error)
+            li_error_avg.append(error_avg)
+            li_error_max.append(error_max)
+    #   avg threshold
+    if n_param_set > 1:
+        li_thres_final = map(meen, zip(*li_li_thres))
+        li_mean_final = compute_mean(li_id, li_thres_final, li_fn_csv, li_coi)
+        if di_gt:
+            li_error_final = [abs(x1 - x2) for (x1, x2) in zip(li_thres_final, li_tgt)]
+            error_avg_final = sum(li_error_final) / float(len(li_error_final))
+            error_max_final = max(li_error_final)
+    else:
+        li_thres_final = li_li_thres[0]
+        li_mean_final = li_li_mean[0]
+        if di_gt:
+            li_error_final = li_li_error[0]
+            error_avg_final = li_error_avg[0]
+            error_max_final = li_error_max[0]
+
+    return li_id, li_thres_final, li_mean_final, li_tgt, li_error_final, \
+           error_avg_final, error_max_final
+
 
 def process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
 
@@ -135,15 +239,9 @@ def process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos
         if di_gt:
             li_tgt_all += li_tgt
             li_error_all += li_error
-            '''
-            sum_error = sum(li_error)
-            max_error = max(li_error)
-            error_total += sum_error
-            if max_error > error_max:
-                error_max = max_error
-            '''
     if di_gt:
-        error_avg = np.average(li_error)
+        #error_avg = np.average(li_error)
+        error_avg = np.average(li_error_all)
         error_max = max(li_error_all)
     else:
         error_avg = None
@@ -154,23 +252,7 @@ def process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos
 
 def process_pc(error_kind, fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos):
     #   csv 파일을 읽는다
-    li_col_data = get_csv_reader(fn_csv, ',')
-    di_col_li_val = {}
-    di_col_valley = {}
-    #   각 컬럼에 대해
-    for row in li_col_data:
-        #   column of interest에 해당하지 않으면
-        for header, value in row.items():
-            for coi in li_coi:
-                if coi not in header:
-                    continue
-                val = float(value)
-                try:
-                    di_col_li_val[header].append(val)
-                except KeyError:
-                    di_col_li_val[header] = [val]
-            #   건너 뛴다
-        #   데이터에서 계곡을 찾는다.
+    di_col_li_val = get_dict_of_column_2_data_list_from_csv(fn_csv, li_coi)
     #loss_total = 0
     #loss_max = -1
     if di_gt:
@@ -205,19 +287,21 @@ error : 52.7261853982
 
 def parse_args():
     parser = OptionParser('Finding valley in 1D data')
-    #parser.add_argument('-c', '--coi', action='append', nargs=2)
+    '''
+    parser.add_option('-w', '--wid', dest='wid', help="bin width")
+    parser.add_option('-r', '--bi', dest='bi', help="bin interval")
     parser.add_option('-b', '--bias', dest='bias', help="bias")
+    parser.add_option('-n', '--n_div', dest='n_div', help="position")
+    '''
+    parser.add_option('-P', '--param', dest='param', help="parameter file")
     parser.add_option('-c', '--coi', dest='coi', nargs=2, help="columns of interest")
     parser.add_option('-g', '--gt', dest='gt', help="ground truth")
     parser.add_option('-k', '--kind', dest='kind', help="error kind")
-    parser.add_option('-n', '--n_div', dest='n_div', help="position")
     parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
-    parser.add_option('-r', '--bi', dest='bi', help="bin interval")
-    parser.add_option('-w', '--wid', dest='wid', help="bin width")
     (options, args) = parser.parse_args()
-    return options.kind, options.pc, options.coi, int(options.bi), options.gt, \
-           float(options.n_div), float(options.bias), \
-           float(options.wid), args[0]
+    return options.kind, options.pc, options.coi, options.gt, \
+           options.param, \
+           args[0]
 
 
 
@@ -226,7 +310,7 @@ def parse_args():
 
 def main():
     #   인자를 파싱한다.
-    error_kind, li_pc, li_coi, bin_int, csv_gt, pos, baias, bin_width, dir_csv = parse_args()
+    error_kind, li_pc, li_coi, csv_gt, fn_param, dir_csv = parse_args()
     li_fn_csv = \
         get_list_of_files_with_string_under_subfolders(
             dir_csv, li_pc)
@@ -234,6 +318,7 @@ def main():
         di_gt = get_ground_truth(csv_gt)
     else:
         di_gt = None
+    '''
     #bin_width = 5
     print('bin_width : {}'.format(bin_width))
     bin_width = float(bin_width)
@@ -241,20 +326,28 @@ def main():
     print('bin_int : {}'.format(bin_int))
     print('baias : {}'.format(baias))  # bin_int = float(bin_int)
     print('pos : {}'.format(pos))
-    li_id_all, li_thres_all, li_mean_all, li_tgt_all, li_error_all, error_avg, error_max = \
-        process(error_kind, li_fn_csv, li_coi, di_gt, bin_width, bin_int, baias, pos)
+    '''
+    li_id, li_thres, li_mean, li_tgt, li_error, error_avg, error_max = \
+        process2(error_kind, li_fn_csv, li_coi, di_gt, fn_param)
+
+    li_thres_int = [int(round(elem)) for elem in li_thres]
+    li_mean_int = [int(round(elem)) for elem in li_mean]
 
     #n_data = len(li_error_all)
     if csv_gt:
         print('error_avg : %f' % (error_avg))
         print('error_max : %f' % (error_max))
     print('li_id_all :')
-    print(li_id_all)
+    print(li_id)
     print('li_thres_all :')
-    print(li_thres_all)
+    print(li_thres_int)
+    print('li_mean_all :')
+    print(li_mean_int)
     return
 
 # usage
-#python main.py -b 2 -c Ch1 Ch2 -n 5 -p B01 B03 F03 D02 -r 2 40 ./RawData
+#
+#   avg thres 18.0056
+#python main2.py -P param.txt -c Ch1 Ch2 -g ./RawData/thres_gt.txt -p B01 B03 F03 D02 ./RawData
 if __name__ == "__main__":
     main()
