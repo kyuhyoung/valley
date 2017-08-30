@@ -7,7 +7,8 @@ def get_exact_file_name_from_path(path):
     return os.path.splitext(os.path.basename(path))[0]
 
 
-def get_list_of_files_with_string_under_subfolders(folder_name, li_str):
+def get_list_of_files_with_string_under_subfolders(
+        folder_name, di_id_2_di_pc):
     '''Makes list of file names which includes any of given strings under any sub-folders of the given folder
 
     For example
@@ -41,8 +42,13 @@ def get_list_of_files_with_string_under_subfolders(folder_name, li_str):
     for dirpath, dirnames, filenames in os.walk(folder_name):
         # for filename in [f for f in filenames if f.endswith(".log")]:
         for fn in filenames:
-            for str in li_str:
-                if str in fn:
+            id = fn.split('_')[0]
+            if id not in di_id_2_di_pc:
+                continue
+            di_pc = di_id_2_di_pc[id]
+            #for str in li_str:
+            for pc, iid in di_pc.items():
+                if iid in fn:
                     li_fn.append(os.path.join(dirpath, fn))
     return li_fn
 

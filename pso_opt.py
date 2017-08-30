@@ -283,19 +283,23 @@ def get_bounds_txt(fx_bounds):
 
 
 def get_ground_truth(fn_gt):
-    di_year_pc_2_thres = {}
+    di_year_pc_2_thres, di_id_2_di_pc = {}, {}
     with open(fn_gt) as gt:
         for line in gt:
             token = line.split(' ')
             date = token[0]
-            pc = token[1]
-            thres_ch1 = float(token[2])
-            thres_ch2 = float(token[3])
-            id_ch1 = date + '_' + pc + '_Ch1'
-            id_ch2 = date + '_' + pc + '_Ch2'
+            id = token[1]
+            pc = token[2]
+            thres_ch1 = float(token[3])
+            thres_ch2 = float(token[4])
+            id_ch1 = date + '_' + id + '_Ch1'
+            id_ch2 = date + '_' + id + '_Ch2'
             di_year_pc_2_thres[id_ch1] = thres_ch1
             di_year_pc_2_thres[id_ch2] = thres_ch2
-    return di_year_pc_2_thres
+            if date not in di_id_2_di_pc:
+                di_id_2_di_pc[date] = {}
+            di_id_2_di_pc[date][pc] = id
+    return di_year_pc_2_thres, di_id_2_di_pc
 
 
 # -B bounds.txt -c
@@ -307,11 +311,11 @@ def parse_args():
     parser.add_option('-C', '--criterion', dest='criterion', help="error criterion")
     parser.add_option('-g', '--gt', dest='gt', help="ground truth")
     parser.add_option('-k', '--kind', dest='kind', help="error kind")
-    parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
+    #parser.add_option('-p', '--pc', dest="pc", nargs=4, help="files of interest")
     #parser.add_option('-r', '--bi', dest='bi', help="bin interval")
     parser.add_option('-s', '--swarm', dest='swarm', help="swarm size")
     (options, args) = parser.parse_args()
-    return options.pc, options.coi, options.gt, options.bound, options.kind, \
+    return options.coi, options.gt, options.bound, options.kind, \
            options.criterion, int(options.swarm),  args[0]
 
 '''
@@ -352,11 +356,11 @@ def parse_args():
 def main():
     global g_lb, g_ub, g_size_swarm, g_error_kind, \
         g_criterion, g_csv_gt, g_li_fn_csv, g_li_coi, g_di_gt
-    li_pc, g_li_coi, csv_gt, fn_bound, g_error_kind, g_criterion, g_size_swarm, dir_csv = parse_args()
+    g_li_coi, csv_gt, fn_bound, g_error_kind, g_criterion, g_size_swarm, dir_csv = parse_args()
+    g_di_gt, di_id_2_di_pc = get_ground_truth(csv_gt)
     g_li_fn_csv = \
         get_list_of_files_with_string_under_subfolders(
-            dir_csv, li_pc)
-    g_di_gt = get_ground_truth(csv_gt)
+            dir_csv, di_id_2_di_pc)
     #g_size_swarm = int(opts.size_swarm)
     g_lb, g_ub = get_bounds_txt(fn_bound)
 
